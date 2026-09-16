@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0c0d12">
+  <title>Tesla IPTV Player</title>
+  
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Top Navigation Bar -->
+    <header class="top-bar">
+      <div class="brand">
+        <div class="brand-icon">T</div>
+        <span>TESLA IPTV</span>
+        <span class="brand-badge">MODEL 3</span>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="nav-tabs">
+        <button class="tab-btn active" data-tab="live">📺 Live TV</button>
+        <button class="tab-btn" data-tab="vod">🎬 Movies</button>
+        <button class="tab-btn" data-tab="series">🍿 Series</button>
+        <button class="tab-btn" data-tab="favs">★ Favorites</button>
+      </nav>
+
+      <!-- Action Buttons -->
+      <div class="header-actions">
+        <button class="icon-btn" id="toggle-sidebar-btn" title="Toggle Channel List">☰ List</button>
+        <button class="icon-btn primary" id="theater-btn" title="Tesla Theater Fullscreen Guide">⚡ Theater Mode</button>
+        <button class="icon-btn" id="settings-btn" title="Settings & Account">⚙️ Account</button>
+      </div>
+    </header>
+
+    <!-- Main Content Split -->
+    <main class="main-content">
+      <!-- Left Panel: Channel & Media Explorer -->
+      <aside class="explorer-panel">
+        <div class="explorer-controls">
+          <!-- Search Bar -->
+          <div class="search-bar">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="search-input" class="search-input" placeholder="Search channels & movies..." autocomplete="off">
+            <button id="clear-search-btn" class="clear-search-btn" style="display: none;">✕</button>
+          </div>
+
+          <!-- Category Selector -->
+          <div class="category-select-wrapper">
+            <select id="category-select" class="category-select">
+              <option value="all">★ All Categories</option>
+            </select>
+            <span class="category-select-arrow">▼</span>
+          </div>
+        </div>
+
+        <!-- Stream List Container -->
+        <div class="stream-list-container custom-scroll">
+          <div id="stream-list">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+      </aside>
+
+      <!-- Right Panel: Video Player Stage -->
+      <section class="stage-panel">
+        <div class="video-container">
+          <video id="iptv-video" playsinline webkit-playsinline></video>
+
+          <!-- Loading / Buffering State Overlay -->
+          <div id="player-state-overlay" class="player-state-overlay" style="display: none;">
+            <div class="spinner"></div>
+            <div id="player-state-msg" class="player-state-msg">Loading stream...</div>
+          </div>
+
+          <!-- Touch Video Overlay Controls -->
+          <div class="video-overlay">
+            <!-- Top Bar: Channel info & EPG -->
+            <div class="overlay-top">
+              <div class="current-info">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span id="live-badge" class="live-badge">LIVE</span>
+                  <h2 id="current-title" class="current-title">Select a channel</h2>
+                </div>
+                <div id="current-epg" class="current-epg">Now playing info will appear here</div>
+              </div>
+
+              <!-- Quick action -->
+              <button class="ctrl-btn" id="fullscreen-btn" title="Fullscreen">⛶ Fullscreen</button>
+            </div>
+
+            <!-- Center: Big Play/Pause Button -->
+            <div class="overlay-center">
+              <button class="center-play-btn" id="center-play-btn">▶</button>
+            </div>
+
+            <!-- Bottom Bar: Playback Controls & Channel Flipping -->
+            <div class="overlay-bottom">
+              <div class="controls-row">
+                <div class="controls-left">
+                  <button class="ctrl-btn primary" id="play-pause-btn">▶</button>
+                  <button class="ctrl-btn" id="mute-btn">🔊</button>
+                  <button class="ctrl-btn" id="aspect-btn" title="Aspect Ratio">📐 Fit</button>
+                </div>
+
+                <!-- Touch-friendly Channel Changers -->
+                <div class="controls-center">
+                  <div class="channel-switcher">
+                    <button id="channel-prev-btn" title="Previous Channel">▲ CH -</button>
+                    <button id="channel-next-btn" title="Next Channel">▼ CH +</button>
+                  </div>
+                </div>
+
+                <div class="controls-right">
+                  <!-- Additional controls if needed -->
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Login Modal -->
+    <div id="login-modal" class="modal-backdrop" style="display: none;">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div class="brand-icon">T</div>
+            <h2 class="modal-title">Xtream Codes Login</h2>
+          </div>
+          <button class="modal-close-btn" title="Close">✕</button>
+        </div>
+
+        <form id="login-form">
+          <div class="modal-body">
+            <div id="login-error" style="display: none; background-color: rgba(232,33,39,0.15); border: 1px solid var(--tesla-red); color: #ff8589; padding: 0.75rem 1rem; border-radius: var(--radius-sm); font-size: 0.95rem;"></div>
+
+            <div class="form-group">
+              <label class="form-label" for="server-url-input">Server URL (with port)</label>
+              <input type="text" id="server-url-input" class="form-input" placeholder="http://iptv-server.com:8080" required>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="username-input">Username</label>
+              <input type="text" id="username-input" class="form-input" placeholder="Your username" required autocomplete="username">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="password-input">Password</label>
+              <input type="password" id="password-input" class="form-input" placeholder="Your password" required autocomplete="current-password">
+            </div>
+
+            <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.4;">
+              💡 Credentials are securely stored directly in your Tesla's browser local storage so you remain logged in on every drive.
+            </p>
+          </div>
+
+          <div class="modal-footer">
+            <button type="submit" class="btn btn-primary" style="width: 100%;">Connect & Stream</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Tesla Theater Mode Modal -->
+    <div id="theater-modal" class="modal-backdrop" style="display: none;">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title">⚡ Tesla Full-Screen Theater Mode</h2>
+          <button class="modal-close-btn">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="theater-instructions-box">
+            <p><strong>How to achieve true 100% Full Screen in your 2019 Tesla Model 3:</strong></p>
+            <ol style="margin-left: 1.25rem; margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem;">
+              <li>Park your Tesla and open the <strong>Theater</strong> app on your center screen.</li>
+              <li>Open <strong>YouTube</strong> in Tesla Theater.</li>
+              <li>Sign in or open any video description that has a web link, or click "Privacy Policy" / "Terms" at the bottom to trigger a web browser inside Theater mode.</li>
+              <li>Navigate to the direct Theater redirect link below:</li>
+            </ol>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Tesla Theater Redirect URL:</label>
+            <div id="theater-redirect-link" class="theater-url-box">Loading...</div>
+          </div>
+
+          <div style="display: flex; gap: 0.75rem;">
+            <button id="copy-theater-link-btn" class="btn btn-secondary" style="flex: 1;">Copy Link</button>
+            <a id="open-theater-direct-btn" href="#" target="_blank" class="btn btn-primary" style="flex: 1; text-decoration: none;">Launch Redirect</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings / Account Modal -->
+    <div id="settings-modal" class="modal-backdrop" style="display: none;">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title">⚙️ Account & Settings</h2>
+          <button class="modal-close-btn">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="theater-instructions-box">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+              <div>
+                <span class="form-label">Status:</span>
+                <p id="account-status" style="font-weight: 700; color: var(--accent-green); margin-top: 4px;">Active</p>
+              </div>
+              <div>
+                <span class="form-label">Expiry Date:</span>
+                <p id="account-expiry" style="font-weight: 600; margin-top: 4px;">-</p>
+              </div>
+              <div>
+                <span class="form-label">Active Connections:</span>
+                <p id="account-connections" style="font-weight: 600; margin-top: 4px;">-</p>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top: 1rem;">
+            <button id="logout-btn" class="btn btn-secondary" style="width: 100%; border-color: var(--tesla-red); color: var(--tesla-red);">
+              Log Out / Switch Account
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Vendor Streaming Scripts -->
+  <script src="/static/vendor/hls.min.js"></script>
+  <script src="/static/vendor/mpegts.min.js"></script>
+  
+  <!-- Player and App Scripts -->
+  <script src="/static/js/player.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

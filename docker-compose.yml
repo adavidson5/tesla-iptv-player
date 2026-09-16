@@ -1,0 +1,9 @@
+services:
+  tesla-iptv:
+    build: .
+    container_name: tesla-iptv-player
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1

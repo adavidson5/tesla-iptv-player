@@ -1,0 +1,877 @@
+/* Tesla Model 3 IPTV Player - Touch-Optimized Dark UI */
+:root {
+  --bg-main: #0c0d12;
+  --bg-surface: #151720;
+  --bg-card: #1c1e2b;
+  --bg-card-hover: #26293a;
+  --bg-glass: rgba(20, 22, 32, 0.85);
+  
+  --tesla-red: #e82127;
+  --tesla-red-hover: #ff3338;
+  --accent-blue: #3b82f6;
+  --accent-green: #10b981;
+  --accent-gold: #f59e0b;
+  
+  --text-primary: #f3f4f6;
+  --text-secondary: #9ca3af;
+  --text-muted: #6b7280;
+  
+  --border-color: #2b2e40;
+  --border-light: #3d4157;
+  
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-full: 9999px;
+  
+  --touch-target-min: 52px;
+  --header-height: 64px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--bg-main);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+/* App Container */
+#app {
+  display: flex;
+  flex-direction: column;
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+}
+
+/* Header Bar */
+header.top-bar {
+  height: var(--header-height);
+  background-color: var(--bg-surface);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.25rem;
+  z-index: 100;
+  flex-shrink: 0;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-weight: 700;
+  font-size: 1.25rem;
+  letter-spacing: 0.5px;
+}
+
+.brand-icon {
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, var(--tesla-red), #991216);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 900;
+  font-size: 1.1rem;
+}
+
+.brand-badge {
+  font-size: 0.75rem;
+  background-color: rgba(232, 33, 39, 0.2);
+  color: var(--tesla-red);
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+/* Nav Tabs */
+.nav-tabs {
+  display: flex;
+  background-color: var(--bg-main);
+  padding: 4px;
+  border-radius: var(--radius-md);
+  gap: 4px;
+  border: 1px solid var(--border-color);
+}
+
+.tab-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding: 8px 18px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.tab-btn:hover {
+  color: var(--text-primary);
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.tab-btn.active {
+  background-color: var(--tesla-red);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(232, 33, 39, 0.35);
+}
+
+/* Header Actions */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.icon-btn {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  min-width: var(--touch-target-min);
+  min-height: 46px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.icon-btn:hover, .icon-btn:active {
+  background-color: var(--bg-card-hover);
+  border-color: var(--border-light);
+}
+
+.icon-btn.primary {
+  background-color: var(--tesla-red);
+  border-color: var(--tesla-red);
+  color: white;
+}
+
+.icon-btn.primary:hover {
+  background-color: var(--tesla-red-hover);
+}
+
+/* Main Split View */
+.main-content {
+  display: flex;
+  flex: 1;
+  height: calc(100vh - var(--header-height));
+  position: relative;
+  overflow: hidden;
+}
+
+/* Left Panel: Channels / VOD / Series Explorer */
+.explorer-panel {
+  width: 440px;
+  background-color: var(--bg-surface);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  height: 100%;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 20;
+}
+
+.explorer-panel.collapsed {
+  width: 0;
+  overflow: hidden;
+  border-right: none;
+}
+
+/* Category & Search Controls */
+.explorer-controls {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--bg-surface);
+}
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  background-color: var(--bg-main);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 0 1rem;
+  min-height: 48px;
+  position: relative;
+}
+
+.search-icon {
+  color: var(--text-muted);
+  margin-right: 8px;
+}
+
+.search-input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-size: 1rem;
+  width: 100%;
+}
+
+.clear-search-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.category-select-wrapper {
+  position: relative;
+}
+
+.category-select {
+  width: 100%;
+  min-height: 48px;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  padding: 0 1rem;
+  font-size: 1rem;
+  font-weight: 500;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
+.category-select-arrow {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--text-secondary);
+}
+
+/* Streams List */
+.stream-list-container {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0.75rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Custom Touch-Friendly Scrollbar */
+.stream-list-container::-webkit-scrollbar,
+.custom-scroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.stream-list-container::-webkit-scrollbar-track,
+.custom-scroll::-webkit-scrollbar-track {
+  background: var(--bg-main);
+}
+
+.stream-list-container::-webkit-scrollbar-thumb,
+.custom-scroll::-webkit-scrollbar-thumb {
+  background: var(--border-light);
+  border-radius: 6px;
+}
+
+.stream-list-container::-webkit-scrollbar-thumb:hover,
+.custom-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+.stream-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* Channel Card */
+.channel-card {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 1rem;
+  min-height: 64px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.channel-card:active {
+  transform: scale(0.98);
+}
+
+.channel-card:hover {
+  background-color: var(--bg-card-hover);
+  border-color: var(--border-light);
+}
+
+.channel-card.active {
+  background-color: rgba(232, 33, 39, 0.12);
+  border-color: var(--tesla-red);
+  box-shadow: inset 4px 0 0 var(--tesla-red);
+}
+
+.channel-logo {
+  width: 46px;
+  height: 46px;
+  border-radius: 8px;
+  background-color: #0e0f14;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.channel-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.channel-logo-placeholder {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.channel-details {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.channel-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.channel-now-playing {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.channel-fav-btn {
+  background: transparent;
+  border: none;
+  font-size: 1.3rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 8px;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease;
+}
+
+.channel-fav-btn.favorited {
+  color: var(--accent-gold);
+}
+
+/* VOD Grid Layout */
+.vod-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 0.75rem;
+  padding: 0.5rem;
+}
+
+.vod-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.vod-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--tesla-red);
+}
+
+.vod-poster {
+  width: 100%;
+  aspect-ratio: 2/3;
+  background-color: #0e0f14;
+  object-fit: cover;
+}
+
+.vod-title {
+  padding: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Right Panel: Video Player Stage */
+.stage-panel {
+  flex: 1;
+  height: 100%;
+  background-color: #000000;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.video-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #000000;
+}
+
+video#iptv-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background-color: #000000;
+}
+
+/* Aspect Ratio Variations */
+video#iptv-video.aspect-fill {
+  object-fit: fill;
+}
+video#iptv-video.aspect-cover {
+  object-fit: cover;
+}
+video#iptv-video.aspect-contain {
+  object-fit: contain;
+}
+
+/* Video Overlay Controls */
+.video-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 1.25rem;
+  background: linear-gradient(
+    to bottom,
+    rgba(0,0,0,0.85) 0%,
+    transparent 20%,
+    transparent 75%,
+    rgba(0,0,0,0.92) 100%
+  );
+  opacity: 1;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.video-overlay.hidden {
+  opacity: 0;
+}
+
+.video-overlay * {
+  pointer-events: auto;
+}
+
+/* Top Overlay: Title & EPG Info */
+.overlay-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.current-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.current-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+}
+
+.current-epg {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.live-badge {
+  background-color: var(--tesla-red);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Center Quick Action (Play / Buffer Indicator) */
+.overlay-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.center-play-btn {
+  width: 80px;
+  height: 80px;
+  background-color: rgba(232, 33, 39, 0.9);
+  border-radius: var(--radius-full);
+  border: none;
+  color: white;
+  font-size: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(232, 33, 39, 0.5);
+  transition: transform 0.2s ease;
+}
+
+.center-play-btn:active {
+  transform: scale(0.92);
+}
+
+/* Bottom Overlay: Touch Controls */
+.overlay-bottom {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.controls-left, .controls-center, .controls-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.ctrl-btn {
+  background-color: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  min-width: 52px;
+  min-height: 52px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1.15rem;
+  font-weight: 600;
+  padding: 0 12px;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.ctrl-btn:active {
+  transform: scale(0.95);
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+.ctrl-btn.primary {
+  background-color: var(--tesla-red);
+  border-color: var(--tesla-red);
+}
+
+/* Channel Flip Buttons (Up / Down) */
+.channel-switcher {
+  display: flex;
+  background-color: rgba(0, 0, 0, 0.6);
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+}
+
+.channel-switcher button {
+  background: transparent;
+  border: none;
+  color: white;
+  min-width: 54px;
+  min-height: 52px;
+  font-size: 1.2rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.channel-switcher button:first-child {
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.channel-switcher button:active {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Loading & Error States */
+.player-state-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(12, 13, 18, 0.85);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  z-index: 15;
+}
+
+.spinner {
+  width: 54px;
+  height: 54px;
+  border: 4px solid rgba(232, 33, 39, 0.2);
+  border-top-color: var(--tesla-red);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.player-state-msg {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  max-width: 80%;
+  text-align: center;
+}
+
+/* Modal Windows (Login, Settings, Theater Mode) */
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1.5rem;
+}
+
+.modal-content {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  width: 100%;
+  max-width: 560px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.modal-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 4px;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-body {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  max-height: 75vh;
+  overflow-y: auto;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-label {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.form-input {
+  background-color: var(--bg-main);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 1.05rem;
+  padding: 0 1rem;
+  min-height: 52px;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.form-input:focus {
+  border-color: var(--tesla-red);
+}
+
+.modal-footer {
+  padding: 1.25rem 1.5rem;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+}
+
+.btn {
+  min-height: 52px;
+  padding: 0 1.5rem;
+  border-radius: var(--radius-md);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  transition: all 0.2s ease;
+}
+
+.btn-primary {
+  background-color: var(--tesla-red);
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: var(--tesla-red-hover);
+}
+
+.btn-secondary {
+  background-color: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.btn-secondary:hover {
+  background-color: var(--bg-card-hover);
+}
+
+.theater-instructions-box {
+  background-color: var(--bg-main);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.theater-url-box {
+  background-color: #050508;
+  border: 1px dashed var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 1rem;
+  font-family: monospace;
+  font-size: 0.9rem;
+  color: var(--accent-blue);
+  word-break: break-all;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* Responsive adjustments for smaller windows or tablet/phone preview */
+@media (max-width: 900px) {
+  .explorer-panel {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 340px;
+    box-shadow: 4px 0 20px rgba(0,0,0,0.8);
+  }
+}
