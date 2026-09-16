@@ -21,7 +21,7 @@
     activeStream: null,
     activeStreamIndex: -1,
     favorites: JSON.parse(localStorage.getItem('tesla_iptv_favs') || '[]'),
-    streamFormat: localStorage.getItem('tesla_iptv_format') || 'ts', // 'ts' (MPEG-TS, native Xtream) or 'm3u8' (HLS)
+    streamFormat: localStorage.getItem('tesla_iptv_format') || 'm3u8', // 'm3u8' (HLS) or 'ts' (MPEG-TS)
     searchQuery: '',
     isSidebarCollapsed: false,
   };
