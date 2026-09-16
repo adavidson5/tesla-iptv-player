@@ -115,7 +115,7 @@
                 </div>
 
                 <div class="controls-right">
-                  <!-- Additional controls if needed -->
+                  <button class="ctrl-btn" id="format-btn" title="Toggle Stream Engine (TS or HLS)">⚡ TS</button>
                 </div>
               </div>
             </div>
@@ -222,7 +222,18 @@
             </div>
           </div>
 
-          <div style="margin-top: 1rem;">
+          <div class="form-group" style="margin-top: 0.5rem;">
+            <label class="form-label" for="setting-format-select">Default Live TV Stream Engine:</label>
+            <select id="setting-format-select" class="category-select">
+              <option value="ts">⚡ MPEG-TS (Native Xtream .ts - Recommended)</option>
+              <option value="m3u8">📡 HLS (.m3u8 - Apple HTTP Live Streaming)</option>
+            </select>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">
+              95% of IPTV providers broadcast in native MPEG-TS (.ts). If a channel buffers, switch to HLS or vice-versa.
+            </p>
+          </div>
+
+          <div style="margin-top: 0.5rem;">
             <button id="logout-btn" class="btn btn-secondary" style="width: 100%; border-color: var(--tesla-red); color: var(--tesla-red);">
               Log Out / Switch Account
             </button>

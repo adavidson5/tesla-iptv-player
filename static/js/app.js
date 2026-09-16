@@ -21,6 +21,7 @@
     activeStream: null,
     activeStreamIndex: -1,
     favorites: JSON.parse(localStorage.getItem('tesla_iptv_favs') || '[]'),
+    streamFormat: localStorage.getItem('tesla_iptv_format') || 'ts', // 'ts' (MPEG-TS, native Xtream) or 'm3u8' (HLS)
     searchQuery: '',
     isSidebarCollapsed: false,
   };
@@ -51,6 +52,8 @@
     muteBtn: document.getElementById('mute-btn'),
     aspectBtn: document.getElementById('aspect-btn'),
     fullscreenBtn: document.getElementById('fullscreen-btn'),
+    formatBtn: document.getElementById('format-btn'),
+    settingFormatSelect: document.getElementById('setting-format-select'),
     channelPrevBtn: document.getElementById('channel-prev-btn'),
     channelNextBtn: document.getElementById('channel-next-btn'),
     theaterBtn: document.getElementById('theater-btn'),
@@ -65,7 +68,20 @@
   function init() {
     initPlayer();
     initEventListeners();
+    updateFormatButton();
     loadStoredCredentials();
+  }
+
+  function updateFormatButton() {
+    if (elements.formatBtn) {
+      elements.formatBtn.textContent = state.streamFormat === 'ts' ? '⚡ TS' : '📡 HLS';
+      elements.formatBtn.title = state.streamFormat === 'ts'
+        ? 'Stream Engine: MPEG-TS (Click to switch to HLS)'
+        : 'Stream Engine: HLS (Click to switch to MPEG-TS)';
+    }
+    if (elements.settingFormatSelect) {
+      elements.settingFormatSelect.value = state.streamFormat;
+    }
   }
 
   function initPlayer() {
@@ -130,6 +146,29 @@
     elements.fullscreenBtn.addEventListener('click', () => {
       player.requestFullscreen();
     });
+
+    // Stream Engine Format Toggle (TS vs HLS)
+    if (elements.formatBtn) {
+      elements.formatBtn.addEventListener('click', () => {
+        state.streamFormat = state.streamFormat === 'ts' ? 'm3u8' : 'ts';
+        localStorage.setItem('tesla_iptv_format', state.streamFormat);
+        updateFormatButton();
+        if (state.activeStream && state.activeTab === 'live') {
+          playChannelByIndex(state.activeStreamIndex);
+        }
+      });
+    }
+
+    if (elements.settingFormatSelect) {
+      elements.settingFormatSelect.addEventListener('change', (e) => {
+        state.streamFormat = e.target.value;
+        localStorage.setItem('tesla_iptv_format', state.streamFormat);
+        updateFormatButton();
+        if (state.activeStream && state.activeTab === 'live') {
+          playChannelByIndex(state.activeStreamIndex);
+        }
+      });
+    }
 
     // Channel Next / Previous
     elements.channelPrevBtn.addEventListener('click', () => changeChannel(-1));
@@ -506,13 +545,15 @@
     elements.currentEpg.textContent = 'Loading live stream...';
     elements.liveBadge.style.display = 'inline-block';
 
-    // Build proxied stream URL
-    const proxyUrl = `/stream/live/${streamId}?server_url=${encodeURIComponent(state.auth.serverUrl)}&username=${encodeURIComponent(state.auth.username)}&password=${encodeURIComponent(state.auth.password)}&ext=m3u8`;
+    const fmt = state.streamFormat || 'ts';
+
+    // Build proxied stream URL (TS or M3U8 based on user preference/provider support)
+    const proxyUrl = `/stream/live/${streamId}?server_url=${encodeURIComponent(state.auth.serverUrl)}&username=${encodeURIComponent(state.auth.username)}&password=${encodeURIComponent(state.auth.password)}&ext=${fmt}`;
 
     player.loadStream({
       url: proxyUrl,
       title: streamName,
-      format: 'm3u8',
+      format: fmt,
       streamId: streamId,
     });
 

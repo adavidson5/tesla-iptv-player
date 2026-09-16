@@ -1,7 +1,7 @@
 /**
  * Tesla IPTV Player - Video Engine
  * Supports HLS (.m3u8) via Hls.js, raw MPEG-TS (.ts) via mpegts.js, and native HTML5 video.
- * Designed for automotive touchscreens with stall detection & auto-reconnect.
+ * Designed for automotive touchscreens with stall detection, auto-unmute recovery & auto-fallback.
  */
 
 class IPTVPlayer {
@@ -11,12 +11,13 @@ class IPTVPlayer {
     this.hls = null;
     this.mpegtsPlayer = null;
     this.currentStream = null;
-    this.currentFormat = 'm3u8'; // 'm3u8', 'ts', 'direct'
+    this.currentFormat = 'ts'; // 'ts', 'm3u8', 'direct'
     this.aspectRatios = ['aspect-contain', 'aspect-cover', 'aspect-fill'];
     this.currentAspectIdx = 0;
     this.reconnectAttempts = 0;
-    this.maxReconnectAttempts = 5;
+    this.maxReconnectAttempts = 4;
     this.reconnectTimer = null;
+    this.stallTimer = null;
     this.overlayTimer = null;
     this.isOverlayVisible = true;
 
@@ -24,9 +25,9 @@ class IPTVPlayer {
   }
 
   initEventListeners() {
-    // Video element state listeners
     this.video.addEventListener('playing', () => {
       this.reconnectAttempts = 0;
+      clearTimeout(this.stallTimer);
       this.hideLoading();
       this.triggerOverlayFade();
       if (this.options.onPlayStateChange) {
@@ -43,22 +44,60 @@ class IPTVPlayer {
 
     this.video.addEventListener('waiting', () => {
       this.showLoading('Buffering stream...');
+      this.startStallWatchdog();
+    });
+
+    this.video.addEventListener('timeupdate', () => {
+      clearTimeout(this.stallTimer);
     });
 
     this.video.addEventListener('error', (e) => {
       console.error('HTML5 Video Error:', e);
-      this.handleStreamError('Stream playback error. Attempting reconnect...');
+      clearTimeout(this.stallTimer);
+      this.handleStreamError('Stream playback error. Attempting recovery...');
     });
 
     // Touch / click on video container toggles overlay
     const container = this.video.closest('.video-container');
     if (container) {
       container.addEventListener('click', (e) => {
-        // If clicking directly on container or video, toggle overlay
         if (e.target === this.video || e.target.classList.contains('video-container')) {
           this.toggleOverlay();
         }
       });
+    }
+  }
+
+  startStallWatchdog() {
+    clearTimeout(this.stallTimer);
+    // If stream stays buffering for > 7 seconds, attempt failover
+    this.stallTimer = setTimeout(() => {
+      if (this.video.paused || this.video.readyState < 3) {
+        console.warn('Stream stall detected (>7s). Attempting format failover...');
+        this.handleStallFailover();
+      }
+    }, 7000);
+  }
+
+  handleStallFailover() {
+    if (!this.currentStream) return;
+
+    if (this.currentFormat === 'm3u8') {
+      console.log('Failing over from HLS to MPEG-TS...');
+      this.showLoading('HLS stalled. Switching to MPEG-TS mode...');
+      this.currentFormat = 'ts';
+      const tsUrl = this.currentStream.url.replace(/([?&])ext=[^&]+/, '$1ext=ts');
+      this.currentStream.url = tsUrl;
+      this.playMpegTS(tsUrl);
+    } else if (this.currentFormat === 'ts') {
+      console.log('Failing over from MPEG-TS to HLS...');
+      this.showLoading('MPEG-TS stalled. Switching to HLS mode...');
+      this.currentFormat = 'm3u8';
+      const hlsUrl = this.currentStream.url.replace(/([?&])ext=[^&]+/, '$1ext=m3u8');
+      this.currentStream.url = hlsUrl;
+      this.playHLS(hlsUrl);
+    } else {
+      this.handleStreamError('Stream stalled. Reconnecting...');
     }
   }
 
@@ -115,6 +154,7 @@ class IPTVPlayer {
 
   destroyCurrent() {
     clearTimeout(this.reconnectTimer);
+    clearTimeout(this.stallTimer);
 
     if (this.hls) {
       try {
@@ -142,7 +182,7 @@ class IPTVPlayer {
   }
 
   /**
-   * Play stream with format auto-fallback (HLS -> MPEG-TS -> Direct).
+   * Play stream with format selection (defaulting to MPEG-TS for Xtream live streams).
    */
   loadStream(streamConfig) {
     this.currentStream = streamConfig;
@@ -150,7 +190,7 @@ class IPTVPlayer {
     this.showLoading(`Connecting to ${streamConfig.title || 'Channel'}...`);
 
     const { url, format } = streamConfig;
-    this.currentFormat = format || 'm3u8';
+    this.currentFormat = format || 'ts';
 
     if (this.currentFormat === 'm3u8') {
       this.playHLS(url);
@@ -158,6 +198,57 @@ class IPTVPlayer {
       this.playMpegTS(url);
     } else {
       this.playDirect(url);
+    }
+  }
+
+  playMpegTS(streamUrl) {
+    if (window.mpegts && mpegts.isSupported()) {
+      try {
+        const player = mpegts.createPlayer({
+          type: 'mpegts',
+          isLive: true,
+          url: streamUrl,
+        }, {
+          enableWorker: true,
+          lazyLoad: false,
+          liveBufferLatencyChasing: false,
+          autoCleanupSourceBuffer: true,
+          autoCleanupMaxBackwardDuration: 60,
+          autoCleanupMinBackwardDuration: 30,
+        });
+
+        this.mpegtsPlayer = player;
+        player.attachMediaElement(this.video);
+        player.load();
+
+        const playPromise = player.play();
+        if (playPromise && playPromise.catch) {
+          playPromise.catch(err => {
+            console.warn('MPEG-TS Autoplay issue:', err);
+            // If browser blocks unmuted audio autoplay, mute and retry
+            if (err.name === 'NotAllowedError') {
+              this.video.muted = true;
+              player.play().catch(e => console.error('Muted autoplay failed:', e));
+              this.showUnmuteToast();
+            }
+          });
+        }
+
+        player.on(mpegts.Events.ERROR, (errType, errDetail) => {
+          console.error('MPEG-TS error event:', errType, errDetail);
+          // Try HLS failover
+          if (this.currentStream && this.currentFormat === 'ts') {
+            this.handleStallFailover();
+          }
+        });
+
+        this.startStallWatchdog();
+      } catch (err) {
+        console.error('Failed to init mpegts.js:', err);
+        this.playHLS(streamUrl.replace('&ext=ts', '&ext=m3u8'));
+      }
+    } else {
+      this.playHLS(streamUrl.replace('&ext=ts', '&ext=m3u8'));
     }
   }
 
@@ -169,8 +260,8 @@ class IPTVPlayer {
         backBufferLength: 60,
         maxBufferLength: 30,
         maxMaxBufferLength: 60,
-        liveSyncDurationCount: 3,
-        liveMaxLatencyDurationCount: 10,
+        manifestLoadingTimeOut: 6000,
+        manifestLoadingMaxRetry: 2,
       });
 
       this.hls = hls;
@@ -178,74 +269,66 @@ class IPTVPlayer {
       hls.attachMedia(this.video);
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        this.video.play().catch(err => {
-          console.warn('Autoplay prevented, user interaction required:', err);
-          this.showOverlay();
-        });
+        const playPromise = this.video.play();
+        if (playPromise && playPromise.catch) {
+          playPromise.catch(err => {
+            console.warn('HLS Autoplay prevented:', err);
+            if (err.name === 'NotAllowedError') {
+              this.video.muted = true;
+              this.video.play().catch(e => console.error(e));
+              this.showUnmuteToast();
+            }
+          });
+        }
       });
 
       hls.on(Hls.Events.ERROR, (event, data) => {
         if (data.fatal) {
+          console.warn('HLS Fatal Error details:', data.type, data.details);
+          // If manifest cannot be parsed or loaded, immediately fail over to MPEG-TS
+          if (
+            data.details === 'manifestParsingError' ||
+            data.details === 'manifestLoadError' ||
+            data.details === 'manifestLoadTimeOut' ||
+            (data.response && data.response.code >= 400)
+          ) {
+            console.warn('HLS manifest unsupported by IPTV server. Switching to MPEG-TS...');
+            this.showLoading('Switching to MPEG-TS mode...');
+            if (this.currentStream) {
+              this.currentFormat = 'ts';
+              const tsUrl = this.currentStream.url.replace(/([?&])ext=[^&]+/, '$1ext=ts');
+              this.currentStream.url = tsUrl;
+              this.playMpegTS(tsUrl);
+            }
+            return;
+          }
+
           switch (data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR:
-              console.warn('HLS Fatal Network Error, attempting recovery...');
+              console.warn('HLS Network Error, attempting recovery...');
               hls.startLoad();
               break;
             case Hls.ErrorTypes.MEDIA_ERROR:
-              console.warn('HLS Fatal Media Error, attempting recovery...');
+              console.warn('HLS Media Error, attempting recovery...');
               hls.recoverMediaError();
               break;
             default:
-              console.error('Unrecoverable HLS error:', data);
-              this.handleStreamError('Stream error. Falling back to MPEG-TS...');
-              // Fallback to MPEG-TS format if available
-              if (this.currentStream && this.currentFormat === 'm3u8') {
-                this.currentFormat = 'ts';
-                const tsUrl = this.currentStream.url.replace('&ext=m3u8', '&ext=ts');
-                this.currentStream.url = tsUrl;
-                this.playMpegTS(tsUrl);
-              }
+              this.handleStallFailover();
               break;
           }
         }
       });
+
+      this.startStallWatchdog();
     } else if (this.video.canPlayType('application/vnd.apple.mpegurl')) {
-      // Native Apple/Safari HLS
       this.video.src = streamUrl;
-      this.video.play().catch(err => console.warn('Autoplay blocked:', err));
-    } else {
-      this.playDirect(streamUrl);
-    }
-  }
-
-  playMpegTS(streamUrl) {
-    if (window.mpegts && mpegts.isSupported()) {
-      try {
-        const player = mpegts.createPlayer({
-          type: 'mse', // or 'mpegts'
-          isLive: true,
-          url: streamUrl,
-        }, {
-          enableWorker: true,
-          lazyLoad: false,
-          liveBufferLatencyChasing: true,
-          liveBufferLatencyMaxLatency: 3.0,
-          liveBufferLatencyMinRemain: 1.0,
-        });
-
-        this.mpegtsPlayer = player;
-        player.attachMediaElement(this.video);
-        player.load();
-        player.play().catch(err => console.warn('MPEG-TS Autoplay blocked:', err));
-
-        player.on(mpegts.Events.ERROR, (errType, errDetail) => {
-          console.error('MPEG-TS error:', errType, errDetail);
-          this.handleStreamError('MPEG-TS stream stalled. Retrying...');
-        });
-      } catch (err) {
-        console.error('Failed to init mpegts.js:', err);
-        this.playDirect(streamUrl);
-      }
+      this.video.play().catch(err => {
+        if (err.name === 'NotAllowedError') {
+          this.video.muted = true;
+          this.video.play();
+          this.showUnmuteToast();
+        }
+      });
     } else {
       this.playDirect(streamUrl);
     }
@@ -254,10 +337,29 @@ class IPTVPlayer {
   playDirect(streamUrl) {
     this.video.src = streamUrl;
     this.video.load();
-    this.video.play().catch(err => {
-      console.warn('Direct play error/blocked:', err);
-      this.showOverlay();
-    });
+    const p = this.video.play();
+    if (p && p.catch) {
+      p.catch(err => {
+        console.warn('Direct play blocked:', err);
+        if (err.name === 'NotAllowedError') {
+          this.video.muted = true;
+          this.video.play();
+          this.showUnmuteToast();
+        }
+      });
+    }
+  }
+
+  showUnmuteToast() {
+    const muteBtn = document.getElementById('mute-btn');
+    if (muteBtn) {
+      muteBtn.textContent = '🔇 Tap to Unmute';
+      muteBtn.classList.add('primary');
+      setTimeout(() => {
+        muteBtn.textContent = '🔇';
+        muteBtn.classList.remove('primary');
+      }, 4000);
+    }
   }
 
   handleStreamError(message) {
@@ -271,7 +373,7 @@ class IPTVPlayer {
         }
       }, 2500);
     } else {
-      this.showLoading('Stream unavailable or offline. Please select another channel.');
+      this.showLoading('Stream unavailable. Try switching format (TS/HLS) or select another channel.');
     }
   }
 

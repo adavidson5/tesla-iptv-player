@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 from urllib.parse import urljoin, quote
 
-DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+DEFAULT_USER_AGENT = "IPTVSmartersPro/3.0.0 (Linux; Android 12)"
 
 
 def clean_server_url(url: str) -> str:

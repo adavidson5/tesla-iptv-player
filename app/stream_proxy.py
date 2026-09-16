@@ -4,23 +4,15 @@ and CORS issues in the Tesla Chromium browser.
 """
 
 import re
-from typing import AsyncGenerator, Optional
-from urllib.parse import quote, unquote, urljoin, urlparse
+from typing import AsyncGenerator
+from urllib.parse import quote, unquote, urljoin
 import httpx
 from fastapi import Request, Response
 from fastapi.responses import StreamingResponse
 
-DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+# Many IPTV providers restrict access to known IPTV player User-Agents
+IPTV_USER_AGENT = "IPTVSmartersPro/3.0.0 (Linux; Android 12)"
 CHUNK_SIZE = 64 * 1024  # 64 KB chunks for smooth streaming
-
-
-def is_m3u8_content(content_type: str, url: str) -> bool:
-    """Check if the content or URL indicates an HLS playlist."""
-    return (
-        "application/vnd.apple.mpegurl" in content_type.lower()
-        or "application/x-mpegurl" in content_type.lower()
-        or url.lower().endswith(".m3u8")
-    )
 
 
 def rewrite_m3u8(manifest_text: str, base_url: str, proxy_base_url: str) -> str:
@@ -63,27 +55,14 @@ def rewrite_m3u8(manifest_text: str, base_url: str, proxy_base_url: str) -> str:
     return "\n".join(output_lines)
 
 
-async def stream_remote_content(
-    target_url: str,
-    headers: dict,
-    timeout: float = 30.0
-) -> AsyncGenerator[bytes, None]:
-    """Asynchronously stream bytes from a remote IPTV URL in chunks."""
-    async with httpx.AsyncClient(timeout=timeout, verify=False, follow_redirects=True) as client:
-        async with client.stream("GET", target_url, headers=headers) as response:
-            async for chunk in response.aiter_bytes(chunk_size=CHUNK_SIZE):
-                if chunk:
-                    yield chunk
-
-
 async def proxy_stream_request(request: Request, target_url: str) -> Response:
     """
     Proxies an arbitrary video stream or playlist URL.
-    - If M3U8, rewrites segment paths to proxy URLs.
-    - If binary (TS, MP4, etc.), streams response with byte-range and CORS support.
+    - If real M3U8 (#EXTM3U), rewrites segment paths to proxy URLs.
+    - If binary (TS, MP4, etc.), immediately streams via StreamingResponse to avoid buffering hangs.
     """
     forward_headers = {
-        "User-Agent": DEFAULT_USER_AGENT,
+        "User-Agent": IPTV_USER_AGENT,
         "Accept": "*/*",
     }
 
@@ -92,29 +71,58 @@ async def proxy_stream_request(request: Request, target_url: str) -> Response:
     if range_header:
         forward_headers["Range"] = range_header
 
-    client = httpx.AsyncClient(timeout=40.0, verify=False, follow_redirects=True)
+    client = httpx.AsyncClient(timeout=30.0, verify=False, follow_redirects=True)
 
     try:
-        # First check response headers
         req = client.build_request("GET", target_url, headers=forward_headers)
         upstream_resp = await client.send(req, stream=True)
 
         status_code = upstream_resp.status_code
-        content_type = upstream_resp.headers.get("content-type", "video/mp2t")
-
-        # Base proxy URL from incoming request
+        content_type = upstream_resp.headers.get("content-type", "").lower()
         proxy_base_url = str(request.base_url).rstrip("/")
 
-        # If it's an M3U8 manifest, read whole body and rewrite
-        if is_m3u8_content(content_type, target_url):
-            body_bytes = await upstream_resp.aread()
+        # If upstream failed (e.g. 401 Unauthorized, 404 Not Found), return error immediately
+        if status_code >= 400:
+            error_body = await upstream_resp.aread()
+            await upstream_resp.aclose()
+            await client.aclose()
+            return Response(
+                content=error_body,
+                status_code=status_code,
+                headers={"Access-Control-Allow-Origin": "*", "Content-Type": content_type or "text/plain"},
+            )
+
+        # Read first chunk to inspect header bytes without buffering the whole infinite stream
+        stream_iter = upstream_resp.aiter_bytes(chunk_size=CHUNK_SIZE)
+        try:
+            first_chunk = await anext(stream_iter)
+        except StopAsyncIteration:
+            first_chunk = b""
+
+        # Check if the content is truly an HLS M3U8 text manifest
+        is_known_binary = any(t in content_type for t in [
+            "video/mp2t", "video/mp4", "video/mpeg", "video/quicktime", "application/octet-stream"
+        ])
+        starts_with_extm3u = first_chunk.lstrip().startswith(b"#EXTM3U")
+
+        if starts_with_extm3u and not is_known_binary:
+            # It really is an HLS playlist! Read remaining chunks (capped at 512KB so it can never hang)
+            body_parts = [first_chunk]
+            total_size = len(first_chunk)
+            async for chunk in stream_iter:
+                body_parts.append(chunk)
+                total_size += len(chunk)
+                if total_size > 512 * 1024:
+                    break
+
             await upstream_resp.aclose()
             await client.aclose()
 
+            manifest_bytes = b"".join(body_parts)
             try:
-                manifest_text = body_bytes.decode("utf-8", errors="replace")
+                manifest_text = manifest_bytes.decode("utf-8", errors="replace")
                 rewritten = rewrite_m3u8(manifest_text, target_url, proxy_base_url)
-                body_bytes = rewritten.encode("utf-8")
+                manifest_bytes = rewritten.encode("utf-8")
             except Exception:
                 pass
 
@@ -125,23 +133,32 @@ async def proxy_stream_request(request: Request, target_url: str) -> Response:
                 "Access-Control-Allow-Headers": "*",
                 "Cache-Control": "no-cache, no-store, must-revalidate",
             }
-            return Response(content=body_bytes, status_code=status_code, headers=response_headers)
+            return Response(content=manifest_bytes, status_code=status_code, headers=response_headers)
 
-        # For binary streams (TS chunks, MP4, etc.), stream directly to client
+        # Binary stream (MPEG-TS, MP4, etc.) - Stream directly to browser in real-time
         response_headers = {
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
             "Access-Control-Allow-Headers": "*",
+            "Cache-Control": "no-cache, no-store",
         }
 
-        # Forward key headers
-        for h in ("content-type", "content-length", "content-range", "accept-ranges"):
+        # Forward key streaming headers
+        for h in ("content-length", "content-range", "accept-ranges"):
             if h in upstream_resp.headers:
                 response_headers[h] = upstream_resp.headers[h]
 
+        # Determine media type: default to video/mp2t for IPTV live streams
+        media_type = upstream_resp.headers.get("content-type")
+        if not media_type or "text" in media_type.lower() or "octet-stream" in media_type.lower():
+            media_type = "video/mp2t"
+        response_headers["Content-Type"] = media_type
+
         async def body_iterator() -> AsyncGenerator[bytes, None]:
             try:
-                async for chunk in upstream_resp.aiter_bytes(chunk_size=CHUNK_SIZE):
+                if first_chunk:
+                    yield first_chunk
+                async for chunk in stream_iter:
                     yield chunk
             finally:
                 await upstream_resp.aclose()
@@ -151,7 +168,7 @@ async def proxy_stream_request(request: Request, target_url: str) -> Response:
             body_iterator(),
             status_code=status_code,
             headers=response_headers,
-            media_type=content_type,
+            media_type=media_type,
         )
 
     except Exception as e:
